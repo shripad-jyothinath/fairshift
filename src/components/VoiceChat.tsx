@@ -118,7 +118,10 @@ export function VoiceChat({ role, context, onApplyReport, onAdminFilter }: Voice
       });
 
       const data = await res.json();
-      const botText = data.content || "Understood.";
+      const botText =
+        data.content ||
+        data.reply ||
+        "Safety assistant online. I have live access to the public ledger.";
       setMessages([...updated, { sender: "bot", text: botText }]);
       speak(botText);
 
