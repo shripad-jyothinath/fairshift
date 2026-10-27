@@ -294,11 +294,11 @@ export function CheckInModal({
               </div>
 
               {/* Admin Actions */}
-              <div style={{ width: "100%", marginTop: 20, display: "flex", gap: 10 }}>
+              <div style={{ width: "100%", marginTop: 20, display: "flex", flexWrap: "wrap", gap: 10 }}>
                 <button
                   type="button"
                   className="btn btn-primary"
-                  style={{ flex: 1, justifyContent: "center" }}
+                  style={{ flex: "1 1 180px", justifyContent: "center" }}
                   onClick={downloadQr}
                 >
                   📥 Download Gate QR (PNG)
@@ -306,7 +306,7 @@ export function CheckInModal({
                 <button
                   type="button"
                   className="btn btn-quiet"
-                  style={{ flex: 1, justifyContent: "center" }}
+                  style={{ flex: "1 1 180px", justifyContent: "center" }}
                   onClick={() => setFullscreen(!fullscreen)}
                 >
                   {fullscreen ? "Exit Kiosk" : "🖥️ Gate Display Mode"}

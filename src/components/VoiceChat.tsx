@@ -376,13 +376,11 @@ export function VoiceChat({
         {/* Expanded Talking Bubble Drawer */}
         {open && (
           <div
+            className="ai-chat-drawer"
             style={{
-              width: "min(390px, calc(100vw - 36px))",
-              maxHeight: 520,
               display: "flex",
               flexDirection: "column",
               background: "var(--card, #1c1917)",
-              borderRadius: 16,
               border: "1px solid rgba(255, 255, 255, 0.15)",
               boxShadow: "0 24px 60px rgba(0, 0, 0, 0.55)",
               overflow: "hidden",
@@ -667,6 +665,7 @@ export function VoiceChat({
             height: 52,
             padding: "0 20px",
             borderRadius: 999,
+            alignSelf: "flex-end",
             border: sessionActive
               ? "2px solid #10b981"
               : "1px solid rgba(255, 255, 255, 0.2)",

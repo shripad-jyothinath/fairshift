@@ -747,38 +747,38 @@ export default function WorkerPage() {
         />
 
         {/* UN SDG 8 Feature Selector Tabs */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 16 }}>
+        <div className="worker-tab-bar" role="tablist" aria-label="Worker views">
           <button
             type="button"
-            className={`btn ${activeTab === "report" ? "btn-primary" : "btn-quiet"}`}
-            style={{ padding: "8px 2px", fontSize: 12, justifyContent: "center" }}
+            className="worker-tab"
+            data-active={activeTab === "report"}
             onClick={() => setActiveTab("report")}
           >
-            ⚠️ Report
+            <span>⚠️</span> Report
           </button>
           <button
             type="button"
-            className={`btn ${activeTab === "corroborate" ? "btn-primary" : "btn-quiet"}`}
-            style={{ padding: "8px 2px", fontSize: 12, justifyContent: "center" }}
+            className="worker-tab"
+            data-active={activeTab === "corroborate"}
             onClick={() => setActiveTab("corroborate")}
           >
-            💬 Comments
+            <span>💬</span> Comments
           </button>
           <button
             type="button"
-            className={`btn ${activeTab === "passport" ? "btn-primary" : "btn-quiet"}`}
-            style={{ padding: "8px 2px", fontSize: 12, justifyContent: "center" }}
+            className="worker-tab"
+            data-active={activeTab === "passport"}
             onClick={() => setActiveTab("passport")}
           >
-            🪪 Passport
+            <span>🪪</span> Passport
           </button>
           <button
             type="button"
-            className={`btn ${activeTab === "fatigue" ? "btn-primary" : "btn-quiet"}`}
-            style={{ padding: "8px 2px", fontSize: 12, justifyContent: "center" }}
+            className="worker-tab"
+            data-active={activeTab === "fatigue"}
             onClick={() => setActiveTab("fatigue")}
           >
-            ⏱️ Fatigue
+            <span>⏱️</span> Fatigue
           </button>
         </div>
 
@@ -914,9 +914,10 @@ export default function WorkerPage() {
                       <label className="small muted" style={{ display: "block", marginBottom: 6 }}>
                         Select Verified Employee Badge:
                       </label>
-                      <div className="voice-row">
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "stretch" }}>
                         <select
                           className="select"
+                          style={{ flex: "1 1 200px" }}
                           value={selectedEmpId}
                           onChange={(e) => {
                             setSelectedEmpId(e.target.value);
@@ -933,6 +934,7 @@ export default function WorkerPage() {
                         <button
                           type="button"
                           className="btn btn-quiet"
+                          style={{ flex: "0 0 auto", whiteSpace: "nowrap" }}
                           onClick={() => handleVerifyEmployee(selectedEmpId)}
                           disabled={verifying}
                         >

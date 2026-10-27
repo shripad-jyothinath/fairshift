@@ -185,6 +185,18 @@ textarea {
   padding: 48px 0 80px;
 }
 
+@media (max-width: 640px) {
+  .wrap {
+    padding: 0 14px;
+  }
+  .page {
+    padding: 20px 0 100px;
+  }
+  .card-pad {
+    padding: 14px 14px;
+  }
+}
+
 .eyebrow {
   font-family: var(--mono);
   font-size: 11px;
@@ -288,9 +300,25 @@ h3 {
 
 @media (max-width: 900px) {
   .grid-2,
-  .grid-3,
-  .grid-4 {
+  .grid-3 {
     grid-template-columns: 1fr;
+  }
+  .grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .stat {
+    padding: 12px 10px;
+  }
+  .stat-value {
+    font-size: 26px;
   }
 }
 
@@ -363,6 +391,21 @@ h3 {
   gap: 10px;
   flex-wrap: wrap;
   align-items: center;
+}
+
+@media (max-width: 640px) {
+  .btn-row {
+    width: 100%;
+    display: flex;
+    gap: 8px;
+  }
+  .btn-row .btn {
+    flex: 1 1 calc(50% - 8px);
+    padding: 8px 10px;
+    font-size: 12.5px;
+    min-height: 40px;
+    text-align: center;
+  }
 }
 
 /* ------------------------------------------------------------------ forms */
@@ -500,20 +543,83 @@ h3 {
 
 @media (max-width: 720px) {
   .nav-inner {
-    flex-wrap: wrap;
+    padding: 8px 12px;
     gap: 8px;
-    padding: 10px 16px;
+  }
+  .brand {
+    font-size: 18px;
+    gap: 8px;
+  }
+  .seal-mark {
+    width: 26px;
+    height: 26px;
+    font-size: 10px;
   }
   .net-chip {
     display: none;
   }
   .nav-links {
-    width: 100%;
+    width: auto;
+    margin-left: auto;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 2px;
+  }
+  .nav-link {
+    padding: 6px 8px;
+    font-size: 11px;
+    letter-spacing: 0.03em;
   }
 }
 
 /* ------------------------------------------------------------------ worker */
+
+.worker-tab-bar {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 4px;
+  background: var(--paper-deep);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  margin-bottom: 16px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.worker-tab-bar::-webkit-scrollbar {
+  display: none;
+}
+.worker-tab {
+  flex: 1 1 0;
+  min-width: max-content;
+  padding: 9px 14px;
+  min-height: 42px;
+  font-size: 12.5px;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.worker-tab[data-active="true"] {
+  background: var(--ink);
+  color: var(--paper);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+@media (max-width: 480px) {
+  .worker-tab {
+    padding: 8px 11px;
+    font-size: 11.5px;
+    gap: 4px;
+  }
+}
 
 .worker-shell {
   max-width: 520px;
@@ -523,6 +629,39 @@ h3 {
   box-shadow: 0 18px 40px -30px rgba(23, 19, 15, 0.5);
   border-radius: 18px;
   overflow: hidden;
+}
+
+@media (max-width: 640px) {
+  .worker-shell {
+    border-radius: 14px;
+    box-shadow: 0 8px 20px -12px rgba(23, 19, 15, 0.4);
+  }
+  .worker-head {
+    padding: 14px 14px 12px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .worker-body {
+    padding: 14px;
+  }
+  .cat-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+  .cat-tile {
+    padding: 10px 12px;
+    min-height: 78px;
+    font-size: 12px;
+  }
+  .cat-tile svg {
+    width: 20px;
+    height: 20px;
+  }
+  .zone-grid button {
+    padding: 8px 12px;
+    min-height: 40px;
+    font-size: 12px;
+  }
 }
 
 .worker-head {
@@ -1070,5 +1209,46 @@ details[open] > .block-head {
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* -------------------------------------------------------- voice chat drawer */
+
+.ai-bubble-backdrop {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  font-family: inherit;
+}
+
+.ai-chat-drawer {
+  width: min(400px, calc(100vw - 32px));
+  max-height: 540px;
+  display: flex;
+  flex-direction: column;
+  background: var(--card, #1c1917);
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+@media (max-width: 640px) {
+  .ai-bubble-backdrop {
+    bottom: 14px;
+    right: 14px;
+    left: 14px;
+    align-items: stretch;
+  }
+  .ai-chat-drawer {
+    width: 100% !important;
+    max-height: 75vh !important;
+    border-radius: 20px;
   }
 }
