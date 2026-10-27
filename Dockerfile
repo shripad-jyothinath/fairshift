@@ -23,7 +23,9 @@ ENV FAIRSHIFT_DATA_DIR=/tmp/fairshift
 
 RUN addgroup -S fairshift && adduser -S fairshift -G fairshift
 
+COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 
 RUN mkdir -p /tmp/fairshift && chown -R fairshift:fairshift /tmp/fairshift
 USER fairshift
