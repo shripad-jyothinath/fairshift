@@ -390,6 +390,22 @@ export default function AdminPage() {
             const found = issues.find((i) => i.severity === filter || filter === "ALL");
             if (found) setSelectedId(found.clusterId);
           }}
+          onTriggerAnchor={async () => {
+            setBusy(true);
+            try {
+              const response = await fetch("/api/admin/anchor", { method: "POST" });
+              const data = (await response.json()) as { blockNumber?: string; txHash?: string };
+              if (response.ok) {
+                setToast({
+                  kind: "ok",
+                  message: `Merkle root anchored on Hedera Network! Tx: ${data.txHash?.slice(0, 16) ?? "confirmed"}…`,
+                });
+                await load();
+              }
+            } finally {
+              setBusy(false);
+            }
+          }}
         />
       </div>
     </div>

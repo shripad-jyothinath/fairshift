@@ -928,8 +928,15 @@ export default function WorkerPage() {
       </div>
       <VoiceChat
         role="worker"
-        context={{ siteName: site?.name, zones: site?.zones }}
-        onApplyReport={({ body: voiceText }) => {
+        context={{
+          siteName: site?.name,
+          zones: site?.zones,
+          categories: Object.keys(CATEGORIES),
+        }}
+        onSelectTab={(tab) => setActiveTab(tab)}
+        onApplyReport={({ category: cat, zone: zn, body: voiceText }) => {
+          if (cat && cat in CATEGORIES) setCategory(cat as Category);
+          if (zn) setZone(zn);
           if (voiceText) setBody((prev) => (prev ? prev + " " + voiceText : voiceText));
         }}
       />
