@@ -7,7 +7,7 @@ import type { AppendSync } from "@/lib/ledger/store";
 import type { AnyLedgerEvent, Category, Severity, ZkProof } from "@/lib/ledger/types";
 import { messageForBody } from "@/lib/crypto/field";
 import { scopeForCluster } from "@/lib/zk/verifier";
-import { demoCommitments } from "./identities";
+import { demoCommitments, demoPayroll } from "./identities";
 import seedProofs from "./seed-proofs.json";
 import { DEMO_ORG, DEMO_REPORTS, DEMO_RESOLUTION, DEMO_SITE_DEFS } from "./scenario";
 
@@ -63,6 +63,7 @@ export function seedDemo(append: AppendSync): void {
       group.addMember(commitment);
       const root = group.root.toString();
       const depth = group.depth;
+      const payroll = demoPayroll(site.siteId, index);
       at(ts + 1000 + index, () =>
         append(
           "MEMBER_ADDED",
@@ -73,6 +74,9 @@ export function seedDemo(append: AppendSync): void {
             index,
             root,
             depth,
+            enrollmentId: `seed:${site.siteId}:${index}`,
+            method: "SEED",
+            payrollKey: payroll.publicKey,
           },
           ts + 1000 + index,
         ),

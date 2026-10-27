@@ -52,3 +52,15 @@ export const closeSchema = z.object({
   clusterId: z.string().min(1).max(200),
   note: z.string().min(6).max(500),
 });
+
+export const enrolmentTokenSchema = z.object({
+  siteId: z.string().min(1).max(64),
+});
+
+export const enrolSchema = z.object({
+  token: z.string().min(10).max(4000),
+  commitment: z.string().regex(/^\d{1,78}$/, "expected a field element"),
+  payrollKey: z
+    .string()
+    .regex(/^[A-Za-z0-9+/]{43}=$/, "expected a 32-byte base64 public key"),
+});

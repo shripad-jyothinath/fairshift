@@ -2,12 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { CATEGORIES } from "@/lib/domain";
-import {
-  formatDate,
-  shortHash,
-  timeAgo,
-  titleCase,
-} from "@/lib/format";
+import { shortHash, timeAgo, titleCase, formatDate } from "@/lib/format";
 import type { AnyLedgerEvent } from "@/lib/ledger/types";
 
 interface Block {
@@ -60,6 +55,7 @@ interface PublicIssue {
 interface AuditResult {
   chain: { valid: boolean; checked: number; brokenAt?: number; reason?: string };
   proofs: { checked: number; valid: number; invalid: number };
+  onchain?: { configured: boolean; anchored: boolean; anchoredAt?: string } | null;
   ok: boolean;
 }
 
@@ -175,6 +171,11 @@ export default function LedgerPage() {
             {audit.proofs.invalid > 0 ? ` · ${audit.proofs.invalid} invalid` : ""}.
             {audit.chain.brokenAt
               ? ` Chain broke at event #${audit.chain.brokenAt}: ${audit.chain.reason}.`
+              : ""}
+            {audit.onchain?.configured
+              ? audit.onchain.anchored
+                ? " Latest anchor confirmed on Base Sepolia."
+                : " Latest anchor was not found on Base Sepolia."
               : ""}
           </div>
         )}
@@ -326,7 +327,17 @@ function EventRow({ event }: { event: AnyLedgerEvent }) {
     <div className="event-row">
       <span className="mono small">#{event.seq}</span>
       <span className="event-type">{event.type}</span>
-      <span>{summarise(event)}</span>
+      <span>
+        {summarise(event)}
+        {event.type === "ANCHOR" && event.payload.explorerUrl && (
+          <>
+            {" · "}
+            <a href={event.payload.explorerUrl} target="_blank" rel="noreferrer">
+              BaseScan ↗
+            </a>
+          </>
+        )}
+      </span>
       <span className="event-hash" title={`${event.prevHash} → ${event.hash}`}>
         {shortHash(event.hash, 10)}
       </span>
@@ -355,7 +366,10 @@ function summarise(event: AnyLedgerEvent): string {
     case "ISSUE_CLOSED":
       return event.payload.note;
     case "ANCHOR":
-      return `${event.payload.label} · ${shortHash(event.payload.merkleRoot, 12)}`;
+      return `${event.payload.label} · ${event.payload.mode === "BASE_SEPOLIA" ? "Base Sepolia" : "local"} · ${shortHash(
+        event.payload.merkleRoot,
+        12,
+      )}`;
     default:
       return "";
   }

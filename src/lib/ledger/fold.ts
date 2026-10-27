@@ -26,6 +26,9 @@ export function emptyState(): LedgerState {
     nullifiers: new Set(),
     resolutions: new Map(),
     attestations: new Map(),
+    enrollments: new Set(),
+    payrollKeys: new Map(),
+    memberSites: new Map(),
     lastSeq: 0,
     lastTs: 0,
   };
@@ -71,8 +74,18 @@ export function applyEvent(state: LedgerState, event: AnyLedgerEvent): LedgerSta
       if (members.length !== event.payload.index) {
         throw new LedgerInvariantError("member index out of order");
       }
+      if (state.enrollments.has(event.payload.enrollmentId)) {
+        throw new LedgerInvariantError("enrolment token already used");
+      }
+      // 32-byte Ed25519 public key, base64.
+      if (Buffer.from(event.payload.payrollKey, "base64").length !== 32) {
+        throw new LedgerInvariantError("invalid payroll key");
+      }
       members.push(event.payload.commitment);
       roots.add(event.payload.root);
+      state.enrollments.add(event.payload.enrollmentId);
+      state.payrollKeys.set(event.payload.commitment, event.payload.payrollKey);
+      state.memberSites.set(event.payload.commitment, event.payload.siteId);
       break;
     }
 

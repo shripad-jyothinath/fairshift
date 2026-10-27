@@ -3,8 +3,7 @@ import path from "node:path";
 import { config } from "@/lib/config";
 import { getKeyRing } from "@/lib/crypto/keys";
 import { seedDemo } from "@/lib/demo/seed";
-import { GENESIS_HASH, signedEvent, verifyChain } from "./chain";
-import { applyEvent, emptyState } from "./fold";
+import { GENESIS_HASH, signedEvent, verifyChain } from "./chain";import { applyEvent, emptyState } from "./fold";
 import type {
   Actor,
   AnyLedgerEvent,

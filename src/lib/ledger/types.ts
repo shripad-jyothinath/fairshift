@@ -64,6 +64,11 @@ export interface EventMap {
     index: number;
     root: string;
     depth: number;
+    /** One-time enrolment nonce; prevents replaying a QR token. */
+    enrollmentId: string;
+    method: "SEED" | "QR";
+    /** Ed25519 public key used only for shifts and payslips. */
+    payrollKey: string;
   };
   REPORT_FILED: {
     reportId: string;
@@ -119,6 +124,12 @@ export interface EventMap {
     toSeq: number;
     merkleRoot: string;
     label: string;
+    mode: "LOCAL" | "BASE_SEPOLIA";
+    txHash?: string;
+    chainId?: number;
+    contract?: string;
+    blockNumber?: string;
+    explorerUrl?: string;
   };
 }
 
@@ -195,6 +206,9 @@ export interface LedgerState {
   nullifiers: Set<string>;
   resolutions: Map<string, ResolutionRecord>;
   attestations: Map<string, AttestationRecord>;
+  enrollments: Set<string>;
+  payrollKeys: Map<string, string>;
+  memberSites: Map<string, string>;
   lastSeq: number;
   lastTs: number;
 }

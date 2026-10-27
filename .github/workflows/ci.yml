@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Read-only token: CI never needs to write to the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typecheck, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      # Fixed, non-secret 32-byte key used only by the CI process. This is the
+      # base64 of "0123456789abcdef0123456789abcdef" and must never be reused
+      # for a real deployment.
+      FAIRSHIFT_SEAL_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
+      FAIRSHIFT_DATA_DIR: ${{ runner.temp }}/fairshift
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # public/zk is intentionally gitignored. Cache the ~30 MB of Semaphore
+      # artifacts so most runs do not re-download them.
+      - name: Cache zero-knowledge artifacts
+        id: zk-cache
+        uses: actions/cache@v4
+        with:
+          path: public/zk
+          key: zk-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('scripts/fetch-zk-artifacts.mjs') }}
+
+      - name: Fetch zero-knowledge artifacts
+        if: steps.zk-cache.outputs.cache-hit != 'true'
+        run: npm run setup:zk
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { anchorStatus } from "@/lib/anchor/provider";
 import { config } from "@/lib/config";
 import { getStore } from "@/lib/ledger/store";
 import { publicIssues, statsFor } from "@/lib/ledger/view";
@@ -14,6 +15,7 @@ export async function GET() {
 
   return NextResponse.json({
     demoMode: config.demoMode,
+    anchor: anchorStatus(),
     stats: statsFor(store.state, now),
     head: store.head(),
     chain: {

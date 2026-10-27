@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { anchorStatus } from "@/lib/anchor/provider";
 import { fail, ok, requireRole, serverError } from "@/lib/api/respond";
 import { openSealed } from "@/lib/crypto/seal";
 import { reconcile } from "@/lib/ledger/reconcile";
@@ -64,5 +65,6 @@ export async function GET(request: NextRequest) {
     issues,
     head: store.head(),
     chainLength: store.events.length,
+    anchor: anchorStatus(),
   });
 }

@@ -17,6 +17,13 @@ export function requireRole(request: NextRequest, role: SessionRole) {
   return session?.role === role ? session : null;
 }
 
+/** Worker payroll session travels in a Bearer header, never a cookie (no CSRF). */
+export function bearerToken(request: NextRequest): string | undefined {
+  const header = request.headers.get("authorization");
+  if (!header?.startsWith("Bearer ")) return undefined;
+  return header.slice(7).trim();
+}
+
 export function sessionCookie(token: string, secure: boolean): string {
   return [
     `${SESSION_COOKIE}=${token}`,

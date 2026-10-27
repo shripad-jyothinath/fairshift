@@ -5,6 +5,7 @@
   "description": "FairShift — anonymous, tamper-evident worker safety reporting with zero-knowledge membership proofs.",
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/fetch-zk-artifacts.mjs",
     "build": "next build",
     "postbuild": "node scripts/prepare-standalone.mjs",
     "start": "node .next/standalone/server.js",
@@ -15,17 +16,23 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@noble/curves": "^2.0.1",
+    "@noble/hashes": "^2.0.1",
     "@semaphore-protocol/core": "4.14.5",
     "next": "16.4.3",
+    "qrcode": "^1.5.4",
     "react": "19.3.1",
     "react-dom": "19.3.1",
+    "viem": "^2.38.5",
     "zod": "4.1.13"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.3.3",
     "@types/node": "24.10.1",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.4",
+    "solc": "^0.8.30",
     "tailwindcss": "4.3.3",
     "tsx": "4.20.6",
     "typescript": "5.9.3",

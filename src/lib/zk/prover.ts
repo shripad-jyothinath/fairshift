@@ -11,6 +11,11 @@ export function createIdentity(secret?: string): Identity {
   return new Identity(secret);
 }
 
+/** Restores a device-held identity exported with Identity.export(). */
+export function importIdentity(exported: string): Identity {
+  return Identity.import(exported);
+}
+
 export function commitmentOf(identity: Identity): string {
   return identity.commitment.toString();
 }

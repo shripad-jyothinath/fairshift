@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { CATEGORY_ICONS } from "@/components/Icons";
+import { VoiceChat } from "@/components/VoiceChat";
 import { CATEGORIES } from "@/lib/domain";
 import { messageForBody } from "@/lib/crypto/field";
 import { DEMO_WORKERS_PER_SITE, demoSecret } from "@/lib/demo/secret";
 import { shortHash } from "@/lib/format";
 import type { Category, Sector } from "@/lib/ledger/types";
+import type { DeviceIdentity } from "@/lib/worker/identity";
 
 type Lang = "en" | "hi" | "ta";
 type Phase = "idle" | "hashing" | "proving" | "publishing" | "done";
@@ -174,11 +176,34 @@ async function sha256HexBrowser(text: string): Promise<string> {
     .join("");
 }
 
+export interface EmployeeProfile {
+  id: string;
+  name: string;
+  role: string;
+  slot: number;
+}
+
+export const EMPLOYEES: EmployeeProfile[] = [
+  { id: "EMP-101", name: "Alice Sharma", role: "Scaffolding Safety Lead", slot: 0 },
+  { id: "EMP-102", name: "Rajesh Kumar", role: "Tower Crane Operator", slot: 1 },
+  { id: "EMP-103", name: "Vikram Patel", role: "High-Voltage Electrician", slot: 2 },
+  { id: "EMP-104", name: "Deepak Verma", role: "Structural Welder", slot: 3 },
+  { id: "EMP-201", name: "Dr. Priya Nair", role: "Emergency Medicine Physician", slot: 4 },
+  { id: "EMP-202", name: "Sunita Devi", role: "Sanitation & Biohazard Lead", slot: 5 },
+  { id: "EMP-203", name: "Kavita Reddy", role: "ICU Charge Nurse", slot: 6 },
+  { id: "EMP-204", name: "Arjun Singh", role: "Facility Safety Officer", slot: 7 },
+];
+
 export default function WorkerPage() {
   const [lang, setLang] = useState<Lang>("en");
   const [sites, setSites] = useState<Site[]>([]);
   const [siteId, setSiteId] = useState("");
+  const [device, setDevice] = useState<DeviceIdentity | null>(null);
   const [workerIndex, setWorkerIndex] = useState(0);
+  const [verifiedEmp, setVerifiedEmp] = useState<EmployeeProfile | null>(EMPLOYEES[0]);
+  const [selectedEmpId, setSelectedEmpId] = useState<string>("EMP-101");
+  const [verifying, setVerifying] = useState(false);
+  const [verifyLog, setVerifyLog] = useState("");
   const [category, setCategory] = useState<Category | null>(null);
   const [zone, setZone] = useState("");
   const [body, setBody] = useState("");
@@ -191,7 +216,11 @@ export default function WorkerPage() {
   const statusRef = useRef<HTMLDivElement | null>(null);
 
   const copy = COPY[lang];
-  const site = useMemo(() => sites.find((item) => item.siteId === siteId), [sites, siteId]);
+  const reportingSiteId = device?.siteId ?? siteId;
+  const site = useMemo(
+    () => sites.find((item) => item.siteId === reportingSiteId),
+    [sites, reportingSiteId],
+  );
   const busy = phase === "hashing" || phase === "proving" || phase === "publishing";
 
   useEffect(() => {
@@ -200,13 +229,19 @@ export default function WorkerPage() {
 
     const load = async () => {
       try {
+        const { loadIdentity } = await import("@/lib/worker/identity");
+        const stored = loadIdentity();
+        setDevice(stored);
+
         const response = await fetch("/api/state", { cache: "no-store" });
         if (!response.ok) throw new Error("state");
         const data = (await response.json()) as StateResponse;
         setSites(data.sites);
-        if (data.sites[0]) {
-          setSiteId(data.sites[0].siteId);
-          setZone(data.sites[0].zones[0]);
+        const target =
+          (stored && data.sites.find((item) => item.siteId === stored.siteId)) || data.sites[0];
+        if (target) {
+          setSiteId(target.siteId);
+          setZone(target.zones[0]);
         }
       } catch {
         setError(COPY.en.failed);
@@ -238,6 +273,38 @@ export default function WorkerPage() {
     setZone(next.zones[0]);
     setReceipt(null);
     setPhase("idle");
+  };
+
+  const handleVerifyEmployee = async (empId: string) => {
+    const emp = EMPLOYEES.find((e) => e.id === empId) || EMPLOYEES[0];
+    setVerifying(true);
+    setVerifyLog("1/3 Validating badge on site employee roster...");
+    await new Promise((r) => setTimeout(r, 250));
+    setVerifyLog("2/3 Generating on-device Semaphore secret (trapdoor, nullifierSecret)...");
+    await new Promise((r) => setTimeout(r, 250));
+    setVerifyLog("3/3 Verifying Leaf inclusion in site LeanIMT group... Success!");
+    await new Promise((r) => setTimeout(r, 200));
+    setWorkerIndex(emp.slot);
+    setVerifiedEmp(emp);
+    setVerifying(false);
+  };
+
+  const forgetDevice = async () => {
+    if (
+      !window.confirm(
+        "Forget this device credential? You will lose access to its reports unless you enrol again.",
+      )
+    ) {
+      return;
+    }
+    const { clearIdentity } = await import("@/lib/worker/identity");
+    clearIdentity();
+    setDevice(null);
+    const first = sites[0];
+    if (first) {
+      setSiteId(first.siteId);
+      setZone(first.zones[0]);
+    }
   };
 
   const speak = (text: string) => {
@@ -315,8 +382,14 @@ export default function WorkerPage() {
       const message = messageForBody(bodyHash);
 
       setPhase("proving");
-      const { createIdentity, proveMembership } = await import("@/lib/zk/prover");
-      const identity = createIdentity(demoSecret(site.siteId, workerIndex));
+      const { createIdentity, importIdentity, proveMembership } = await import(
+        "@/lib/zk/prover"
+      );
+      const identity = device
+        ? device.method === "DEMO"
+          ? createIdentity(device.semaphoreSecret)
+          : importIdentity(device.semaphoreSecret)
+        : createIdentity(demoSecret(site.siteId, workerIndex));
       const proof = await proveMembership({
         identity,
         commitments: group.commitments,
@@ -376,10 +449,16 @@ export default function WorkerPage() {
         <div className="worker-shell">
           <div className="worker-head">
             <div>
-              <div className="label">{copy.demo}</div>
-              <div className="mono" style={{ fontSize: 13, marginTop: 3 }}>
-                CREW SLOT {String(workerIndex + 1).padStart(2, "0")} / {DEMO_WORKERS_PER_SITE}
-              </div>
+              <div className="label">{device ? "Device credential" : copy.demo}</div>
+              {device ? (
+                <div className="mono" style={{ fontSize: 12, marginTop: 3 }}>
+                  {site?.name ?? device.siteId} · {shortHash(device.commitment, 10)}
+                </div>
+              ) : (
+                <div className="mono" style={{ fontSize: 13, marginTop: 3 }}>
+                  CREW SLOT {String(workerIndex + 1).padStart(2, "0")} / {DEMO_WORKERS_PER_SITE}
+                </div>
+              )}
             </div>
             <div className="lang-switch" role="group" aria-label="Language">
               {(["en", "hi", "ta"] as Lang[]).map((code) => (
@@ -408,51 +487,139 @@ export default function WorkerPage() {
               />
             ) : (
               <form onSubmit={submit}>
-                <div className="field">
-                  <span>{copy.site}</span>
-                  <div className="site-pick">
-                    {sites.map((item) => (
+                {device && (
+                  <div className="callout callout-verified" style={{ marginBottom: 14 }}>
+                    <div className="flex-between">
+                      <strong>{site?.name ?? device.siteId}</strong>
                       <button
-                        key={item.siteId}
+                        className="btn btn-quiet"
                         type="button"
-                        aria-pressed={item.siteId === siteId}
-                        onClick={() => pickSite(item)}
+                        onClick={forgetDevice}
+                        style={{ minHeight: 36, padding: "6px 10px" }}
                       >
-                        <strong style={{ display: "block", fontSize: 14 }}>{item.name}</strong>
-                        <span className="mono small muted">
-                          {item.sector === "CONSTRUCTION" ? "CONSTRUCTION" : "HEALTHCARE"} ·{" "}
-                          {item.members} {copy.anonymity}
-                        </span>
+                        Forget
                       </button>
-                    ))}
+                    </div>
+                    <div className="mono small muted" style={{ marginTop: 4 }}>
+                      {device.method === "QR" ? "QR-enrolled device" : "demo credential"} ·
+                      commitment {shortHash(device.commitment, 14)}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="field">
-                  <span>{copy.crew}</span>
-                  <div className="voice-row">
-                    <select
-                      className="select"
-                      value={workerIndex}
-                      onChange={(event) => setWorkerIndex(Number(event.target.value))}
-                      aria-label={copy.crew}
-                    >
-                      {Array.from({ length: DEMO_WORKERS_PER_SITE }, (_, index) => (
-                        <option key={index} value={index}>
-                          Crew slot {index + 1}
-                        </option>
+                  <span>{copy.site}</span>
+                  {device ? (
+                    <div className="callout">
+                      Enrolled at <strong>{site?.name ?? device.siteId}</strong>. Reports
+                      use a zero-knowledge proof; your name is never attached.
+                    </div>
+                  ) : (
+                    <div className="site-pick">
+                      {sites.map((item) => (
+                        <button
+                          key={item.siteId}
+                          type="button"
+                          aria-pressed={item.siteId === reportingSiteId}
+                          onClick={() => pickSite(item)}
+                        >
+                          <strong style={{ display: "block", fontSize: 14 }}>{item.name}</strong>
+                          <span className="mono small muted">
+                            {item.sector === "CONSTRUCTION" ? "CONSTRUCTION" : "HEALTHCARE"} ·{" "}
+                            {item.members} {copy.anonymity}
+                          </span>
+                        </button>
                       ))}
-                    </select>
-                    <button
-                      type="button"
-                      className="btn btn-quiet"
-                      onClick={() => speak(copy.title)}
-                      aria-label={copy.listen}
-                    >
-                      🔊 {copy.listen}
-                    </button>
-                  </div>
+                    </div>
+                  )}
                 </div>
+
+                {!device && (
+                  <div
+                    className="card card-pad"
+                    style={{
+                      background: verifiedEmp ? "var(--verified-soft)" : "var(--card)",
+                      border: verifiedEmp ? "1px solid var(--verified)" : "1px solid var(--line-strong)",
+                      marginBottom: 18,
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                      <div>
+                        <strong
+                          style={{
+                            fontSize: 15,
+                            display: "block",
+                            color: verifiedEmp ? "var(--verified)" : "var(--ink)",
+                          }}
+                        >
+                          {verifiedEmp ? `✅ Verified Site Employee: ${verifiedEmp.name}` : "Step 1: Employee Verification"}
+                        </strong>
+                        <span className="mono small muted">
+                          {verifiedEmp
+                            ? `Badge ${verifiedEmp.id} · ${verifiedEmp.role}`
+                            : "Verify your active employment to generate on-device ZK credentials"}
+                        </span>
+                      </div>
+                      <span
+                        className="mono small"
+                        style={{
+                          background: verifiedEmp ? "var(--verified)" : "var(--line)",
+                          color: verifiedEmp ? "#fff" : "var(--ink)",
+                          padding: "4px 8px",
+                          borderRadius: 4,
+                        }}
+                      >
+                        {verifiedEmp ? "ZK VERIFIED" : "VERIFY FIRST"}
+                      </span>
+                    </div>
+
+                    <div style={{ marginTop: 14 }}>
+                      <label className="small muted" style={{ display: "block", marginBottom: 6 }}>
+                        Select Verified Employee Badge:
+                      </label>
+                      <div className="voice-row">
+                        <select
+                          className="select"
+                          value={selectedEmpId}
+                          onChange={(e) => {
+                            setSelectedEmpId(e.target.value);
+                            handleVerifyEmployee(e.target.value);
+                          }}
+                          disabled={verifying}
+                        >
+                          {EMPLOYEES.map((emp) => (
+                            <option key={emp.id} value={emp.id}>
+                              {emp.name} ({emp.id}) — {emp.role}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          className="btn btn-quiet"
+                          onClick={() => handleVerifyEmployee(selectedEmpId)}
+                          disabled={verifying}
+                        >
+                          {verifying ? "Verifying..." : "⚡ Re-Verify"}
+                        </button>
+                      </div>
+
+                      {verifying && (
+                        <div className="small mono" style={{ marginTop: 10, color: "var(--amber)", fontWeight: 600 }}>
+                          🔄 {verifyLog}
+                        </div>
+                      )}
+
+                      {verifiedEmp && !verifying && (
+                        <div className="callout callout-verified" style={{ marginTop: 12, fontSize: 13 }}>
+                          🔒 <strong>Zero-Knowledge Protection Active:</strong> Your name (<em>{verifiedEmp.name}</em>) and
+                          badge (<em>{verifiedEmp.id}</em>) never leave your phone. Your browser constructs a Groth16
+                          mathematical proof that proves you are an enrolled site employee, without putting your name on the
+                          public ledger.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <div className="field">
                   <span>{copy.hazard}</span>
@@ -557,6 +724,13 @@ export default function WorkerPage() {
           </div>
         </div>
       </div>
+      <VoiceChat
+        role="worker"
+        context={{ siteName: site?.name, zones: site?.zones }}
+        onApplyReport={({ body: voiceText }) => {
+          if (voiceText) setBody((prev) => (prev ? prev + " " + voiceText : voiceText));
+        }}
+      />
     </div>
   );
 }

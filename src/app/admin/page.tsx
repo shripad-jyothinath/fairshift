@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { EnrolmentModal } from "@/components/EnrolmentModal";
+import { VoiceChat } from "@/components/VoiceChat";
 import { CATEGORIES, needsOversight } from "@/lib/domain";
 import { shortHash, timeAgo, until } from "@/lib/format";
 import type { Category, Severity } from "@/lib/ledger/types";
@@ -60,6 +62,12 @@ interface IssuesResponse {
   issues: AdminIssue[];
   head: { seq: number; hash: string };
   chainLength: number;
+  anchor: {
+    mode: "LOCAL" | "BASE_SEPOLIA";
+    configured: boolean;
+    chainId: number;
+    contract: string | null;
+  };
 }
 
 type Toast = { kind: "ok" | "err"; message: string } | null;
@@ -82,6 +90,8 @@ export default function AdminPage() {
   const [busy, setBusy] = useState(false);
   const [loginPass, setLoginPass] = useState("");
   const [loginError, setLoginError] = useState("");
+  const [enrolOpen, setEnrolOpen] = useState(false);
+  const [anchor, setAnchor] = useState<IssuesResponse["anchor"] | null>(null);
 
   const load = useCallback(async () => {
     const response = await fetch("/api/admin/issues", { cache: "no-store" });
@@ -97,6 +107,7 @@ export default function AdminPage() {
     const data = (await response.json()) as IssuesResponse;
     setIssues(data.issues);
     setHead(data.head);
+    setAnchor(data.anchor);
     setAuthed(true);
     setSelectedId((current) => {
       if (current && data.issues.some((issue) => issue.clusterId === current)) return current;
@@ -211,6 +222,9 @@ export default function AdminPage() {
             <h2 style={{ marginTop: 10 }}>Accountability docket</h2>
           </div>
           <div className="btn-row">
+            <button className="btn btn-quiet" type="button" onClick={() => setEnrolOpen(true)}>
+              Enrol worker
+            </button>
             <Link className="btn btn-quiet" href="/ledger">
               Public ledger
             </Link>
@@ -219,6 +233,8 @@ export default function AdminPage() {
             </button>
           </div>
         </div>
+
+        <EnrolmentModal open={enrolOpen} onClose={() => setEnrolOpen(false)} />
 
         <div className="grid-4" style={{ marginTop: 26 }}>
           <div className="stat">
@@ -266,11 +282,24 @@ export default function AdminPage() {
                   setBusy(true);
                   try {
                     const response = await fetch("/api/admin/anchor", { method: "POST" });
-                    const data = (await response.json()) as { seq?: number; merkleRoot?: string; error?: string };
+                    const data = (await response.json()) as {
+                      seq?: number;
+                      merkleRoot?: string;
+                      mode?: "LOCAL" | "BASE_SEPOLIA";
+                      txHash?: string;
+                      error?: string;
+                    };
                     if (response.ok) {
+                      const where =
+                        data.mode === "BASE_SEPOLIA"
+                          ? `Base Sepolia · ${shortHash(data.txHash ?? "", 10)}`
+                          : "local ledger";
                       setToast({
                         kind: "ok",
-                        message: `Anchor published at event #${data.seq}. Root ${shortHash(data.merkleRoot ?? "", 14)}`,
+                        message: `Anchor #${data.seq} published · ${where} · root ${shortHash(
+                          data.merkleRoot ?? "",
+                          14,
+                        )}`,
                       });
                       await load();
                     } else {
@@ -347,6 +376,14 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
+        <VoiceChat
+          role="admin"
+          context={{ activeIssues: issues }}
+          onAdminFilter={(filter) => {
+            const found = issues.find((i) => i.severity === filter || filter === "ALL");
+            if (found) setSelectedId(found.clusterId);
+          }}
+        />
       </div>
     </div>
   );

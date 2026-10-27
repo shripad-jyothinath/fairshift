@@ -86,6 +86,9 @@ export const memberFixture = {
     index: 0,
     root: "root-1",
     depth: 1,
+    enrollmentId: "seed:site-a:0",
+    method: "SEED" as const,
+    payrollKey: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
   },
 };
 
