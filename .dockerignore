@@ -1,0 +1,12 @@
+node_modules
+.next
+.data
+.git
+.gitignore
+public/zk
+*.pptx
+README.md
+npm-debug.log*
+.env
+.env.local
+coverage

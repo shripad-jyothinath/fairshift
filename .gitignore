@@ -1,0 +1,15 @@
+node_modules/
+.next/
+out/
+build/
+.data/
+.env
+.env.local
+.env*.local
+public/zk/*.wasm
+public/zk/*.zkey
+npm-debug.log*
+.DS_Store
+*.tsbuildinfo
+next-env.d.ts
+coverage/
