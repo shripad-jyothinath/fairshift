@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { EnrolmentModal } from "@/components/EnrolmentModal";
+import { CheckInModal } from "@/components/CheckInModal";
 import { VoiceChat } from "@/components/VoiceChat";
 import { CATEGORIES, needsOversight } from "@/lib/domain";
 import { shortHash, timeAgo, until } from "@/lib/format";
@@ -98,6 +99,7 @@ export default function AdminPage() {
   const [loginPass, setLoginPass] = useState("");
   const [loginError, setLoginError] = useState("");
   const [enrolOpen, setEnrolOpen] = useState(false);
+  const [gateModalOpen, setGateModalOpen] = useState(false);
   const [anchor, setAnchor] = useState<IssuesResponse["anchor"] | null>(null);
 
   const load = useCallback(async () => {
@@ -229,6 +231,9 @@ export default function AdminPage() {
             <h2 style={{ marginTop: 10 }}>Accountability docket</h2>
           </div>
           <div className="btn-row">
+            <button className="btn btn-primary" type="button" onClick={() => setGateModalOpen(true)}>
+              📱 Gate QR Station
+            </button>
             <button className="btn btn-quiet" type="button" onClick={() => setEnrolOpen(true)}>
               Enrol worker
             </button>
@@ -242,6 +247,15 @@ export default function AdminPage() {
         </div>
 
         <EnrolmentModal open={enrolOpen} onClose={() => setEnrolOpen(false)} />
+        <CheckInModal
+          open={gateModalOpen}
+          onClose={() => setGateModalOpen(false)}
+          mode="admin"
+          sites={[
+            { siteId: "apex-tower-b", name: "Apex Tower B Construction" },
+            { siteId: "saint-jude-er", name: "Saint Jude Hospital ER" },
+          ]}
+        />
 
         <div className="grid-4" style={{ marginTop: 26 }}>
           <div className="stat">
