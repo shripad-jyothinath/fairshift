@@ -371,11 +371,22 @@ export default function WorkerPage() {
       const group = (await groupResponse.json()) as GroupResponse;
       if (!group.anonymous) throw new Error("This site needs at least three credentials.");
 
-      const artifactCheck = await fetch(`/zk/semaphore-${group.depth}.wasm`, {
-        method: "HEAD",
-      });
-      if (!artifactCheck.ok) {
-        throw new Error("Proof artifacts are missing on this server. Run npm run setup:zk.");
+      let customArtifacts: { wasm: string; zkey: string } | undefined;
+      try {
+        const artifactCheck = await fetch(`/zk/semaphore-${group.depth}.wasm`, {
+          method: "HEAD",
+        });
+        if (!artifactCheck.ok) {
+          customArtifacts = {
+            wasm: `https://raw.githubusercontent.com/privacy-scaling-explorations/snark-artifacts/main/packages/semaphore/semaphore-${group.depth}.wasm`,
+            zkey: `https://raw.githubusercontent.com/privacy-scaling-explorations/snark-artifacts/main/packages/semaphore/semaphore-${group.depth}.zkey`,
+          };
+        }
+      } catch {
+        customArtifacts = {
+          wasm: `https://raw.githubusercontent.com/privacy-scaling-explorations/snark-artifacts/main/packages/semaphore/semaphore-${group.depth}.wasm`,
+          zkey: `https://raw.githubusercontent.com/privacy-scaling-explorations/snark-artifacts/main/packages/semaphore/semaphore-${group.depth}.zkey`,
+        };
       }
 
       const bodyHash = await sha256HexBrowser(body);
@@ -395,6 +406,7 @@ export default function WorkerPage() {
         commitments: group.commitments,
         message,
         scope: group.scope,
+        artifacts: customArtifacts,
       });
 
       setPhase("publishing");

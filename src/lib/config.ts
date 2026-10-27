@@ -9,7 +9,13 @@ function secret(name: string, fallback: string): string {
 /** Single place for runtime configuration. No secret ever lives in the repo. */
 export const config = {
   get dataDir(): string {
-    return process.env.FAIRSHIFT_DATA_DIR || path.join(process.cwd(), ".data");
+    if (process.env.FAIRSHIFT_DATA_DIR) {
+      return process.env.FAIRSHIFT_DATA_DIR;
+    }
+    if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+      return "/tmp/.data";
+    }
+    return path.join(process.cwd(), ".data");
   },
   get demoMode(): boolean {
     return process.env.NEXT_PUBLIC_DEMO_MODE !== "false";

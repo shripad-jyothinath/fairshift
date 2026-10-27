@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
+const isVercel = Boolean(process.env.VERCEL);
+
 const nextConfig: NextConfig = {
-  output: "standalone",
+  output: isVercel ? undefined : "standalone",
   poweredByHeader: false,
   serverExternalPackages: [
     "@semaphore-protocol/core",
