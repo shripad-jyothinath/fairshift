@@ -1,16 +1,24 @@
 import type { NextRequest } from "next/server";
 import { fail, ok, requireRole, sameOrigin } from "@/lib/api/respond";
-import { publishAnchor, type AnchorReceipt } from "@/lib/anchor/provider";
+import { publishAnchor, anchorStatus, type AnchorReceipt } from "@/lib/anchor/provider";
 import { merkleRoot } from "@/lib/ledger/merkle";
 import { getStore } from "@/lib/ledger/store";
 
 export const dynamic = "force-dynamic";
 
 /**
+ * Returns current anchor status and network configuration.
+ */
+export async function GET(request: NextRequest) {
+  if (!requireRole(request, "admin")) return fail("Not authorised", 401);
+  return ok(anchorStatus());
+}
+
+/**
  * Anchors all events since the previous anchor under one Merkle root.
  *
- * LOCAL mode records the root in the ledger only. BASE_SEPOLIA mode publishes
- * it to the AnchorRegistry contract and records the real transaction receipt.
+ * LOCAL mode records the root in the ledger only. BASE_SEPOLIA and HEDERA_TESTNET
+ * modes publish it to the target blockchain and record the real transaction receipt.
  * A failure before the on-chain write aborts; a failure after it reports the
  * tx hash so the operator can reconcile rather than blindly retry.
  */
@@ -42,7 +50,7 @@ export async function POST(request: NextRequest) {
       merkleRoot: root,
       label,
       ...receipt,
-    });
+    } as any);
 
     return ok({
       anchored: true,

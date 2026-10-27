@@ -21,8 +21,16 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
 import { ANCHOR_ABI } from "./artifact";
+import {
+  HEDERA_TESTNET_CHAIN_ID,
+  HEDERA_DEFAULT_RPC_URL,
+  HEDERA_EXPLORER_BASE,
+  HEDERA_NETWORK_NAME,
+  publishHederaAnchor,
+  verifyHederaAnchorOnchain,
+} from "./hedera";
 
-export type AnchorMode = "LOCAL" | "BASE_SEPOLIA";
+export type AnchorMode = "LOCAL" | "BASE_SEPOLIA" | "HEDERA_TESTNET" | "HEDERA";
 
 export interface AnchorReceipt {
   mode: AnchorMode;
@@ -31,6 +39,7 @@ export interface AnchorReceipt {
   contract?: string;
   blockNumber?: string;
   explorerUrl?: string;
+  network?: string;
 }
 
 export interface AnchorConfig {
@@ -40,6 +49,8 @@ export interface AnchorConfig {
   /** Server-side secret. Never serialize this object or log this field. */
   privateKey?: Hex;
   contract?: Address;
+  network?: string;
+  explorerUrl?: string;
 }
 
 export interface AnchorStatus {
@@ -47,6 +58,9 @@ export interface AnchorStatus {
   configured: boolean;
   chainId: number;
   contract: Address | null;
+  network?: string;
+  explorerUrl?: string;
+  rpcUrl?: string;
 }
 
 export interface AnchorVerification {
@@ -78,9 +92,10 @@ function readMode(): AnchorMode {
   const normalized = raw.toUpperCase();
   if (normalized === "LOCAL") return "LOCAL";
   if (normalized === "BASE_SEPOLIA") return "BASE_SEPOLIA";
+  if (normalized === "HEDERA_TESTNET" || normalized === "HEDERA") return "HEDERA_TESTNET";
 
   throw new Error(
-    `Invalid ANCHOR_MODE "${raw}". Expected "LOCAL" or "BASE_SEPOLIA".`,
+    `Invalid ANCHOR_MODE "${raw}". Expected "LOCAL", "BASE_SEPOLIA", or "HEDERA_TESTNET".`,
   );
 }
 
@@ -94,6 +109,33 @@ function isHttpUrl(value: string): boolean {
  */
 export function anchorConfig(): AnchorConfig {
   const mode = readMode();
+  if (mode === "HEDERA_TESTNET" || mode === "HEDERA") {
+    const rpcUrl = process.env.HEDERA_RPC_URL?.trim() || HEDERA_DEFAULT_RPC_URL;
+    const rawKey =
+      process.env.HEDERA_PRIVATE_KEY?.trim() ||
+      process.env.ANCHOR_PRIVATE_KEY?.trim();
+    const rawContract =
+      process.env.HEDERA_CONTRACT_ADDRESS?.trim() ||
+      process.env.ANCHOR_CONTRACT_ADDRESS?.trim();
+
+    const privateKey =
+      rawKey && PRIVATE_KEY_PATTERN.test(rawKey) ? (rawKey as Hex) : undefined;
+    const contract =
+      rawContract && isAddress(rawContract, { strict: false })
+        ? (rawContract as Address)
+        : undefined;
+
+    return {
+      mode: "HEDERA_TESTNET",
+      rpcUrl,
+      privateKey,
+      contract,
+      configured: isHttpUrl(rpcUrl),
+      network: HEDERA_NETWORK_NAME,
+      explorerUrl: HEDERA_EXPLORER_BASE,
+    };
+  }
+
   const rpcUrl = process.env.BASE_SEPOLIA_RPC_URL?.trim() || DEFAULT_RPC_URL;
   const rawKey = process.env.ANCHOR_PRIVATE_KEY?.trim();
   const rawContract = process.env.ANCHOR_CONTRACT_ADDRESS?.trim();
@@ -204,6 +246,18 @@ export async function publishAnchor({
     return { mode: "LOCAL" };
   }
 
+  if (config.mode === "HEDERA_TESTNET" || config.mode === "HEDERA") {
+    return publishHederaAnchor({
+      root,
+      label,
+      options: {
+        rpcUrl: config.rpcUrl,
+        privateKey: config.privateKey,
+        contract: config.contract,
+      },
+    });
+  }
+
   const { privateKey, contract, rpcUrl } = requireBaseSepoliaConfig(config);
   const rootHex = normalizeRoot(root);
   const normalizedLabel = label.trim();
@@ -259,6 +313,10 @@ export async function verifyAnchorOnchain(
   root: string,
 ): Promise<AnchorVerification> {
   const config = anchorConfig();
+  if (config.mode === "HEDERA_TESTNET" || config.mode === "HEDERA") {
+    return verifyHederaAnchorOnchain(root, config.contract, config.rpcUrl);
+  }
+
   if (!config.configured || !config.contract) {
     return { configured: false, anchored: false };
   }
@@ -290,6 +348,18 @@ export async function verifyAnchorOnchain(
 /** Public-safe anchor status for the UI/API. Never includes secrets. */
 export function anchorStatus(): AnchorStatus {
   const config = anchorConfig();
+  if (config.mode === "HEDERA_TESTNET" || config.mode === "HEDERA") {
+    return {
+      mode: "HEDERA_TESTNET",
+      configured: config.configured,
+      chainId: HEDERA_TESTNET_CHAIN_ID,
+      contract: config.contract ?? null,
+      network: HEDERA_NETWORK_NAME,
+      explorerUrl: HEDERA_EXPLORER_BASE,
+      rpcUrl: config.rpcUrl,
+    };
+  }
+
   return {
     mode: config.mode,
     configured: config.configured,
