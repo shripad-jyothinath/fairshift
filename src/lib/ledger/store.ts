@@ -24,6 +24,8 @@ const ALLOWED_ACTORS: Record<EventType, Actor[]> = {
   RESOLUTION_PUBLISHED: ["admin"],
   OVERSIGHT_ATTESTED: ["oversight"],
   ISSUE_CLOSED: ["admin"],
+  COMMENT_ADDED: ["system", "admin"],
+  FATIGUE_ALERT_RAISED: ["system", "admin"],
   ANCHOR: ["admin"],
 };
 

@@ -187,6 +187,58 @@ export function seedDemo(append: AppendSync): void {
     ),
   );
 
+  // Seed verified employee comments on active safety issues
+  const apexScaffoldingCluster = clusterIdFor("apex-tower-b", "STRUCTURAL", "Exterior Hoist B");
+  at(now - 1 * HOUR, () =>
+    append(
+      "COMMENT_ADDED",
+      "system",
+      {
+        commentId: "cmt_apex_01",
+        clusterId: apexScaffoldingCluster,
+        siteId: "apex-tower-b",
+        body: "Confirmed. Coupler locking pin on Level 4 is still damaged. Site safety marshal needs to tag out the hoist immediately.",
+        authorBadgeMask: "Verified Site Worker (Level 2 Certified)",
+        nullifier: "null_cmt_01",
+      },
+      now - 1 * HOUR,
+    ),
+  );
+
+  const erBiohazardCluster = clusterIdFor("saint-jude-er", "MACHINERY", "Sanitation Airlock");
+  at(now - 30 * 60 * 1000, () =>
+    append(
+      "COMMENT_ADDED",
+      "system",
+      {
+        commentId: "cmt_er_01",
+        clusterId: erBiohazardCluster,
+        siteId: "saint-jude-er",
+        body: "Corroborated by ER night shift. Autoclave pressure sensor displayed warning error code E-4 again during sterilisation.",
+        authorBadgeMask: "Verified Hospital Staff (Charge Nurse)",
+        nullifier: "null_cmt_02",
+      },
+      now - 30 * 60 * 1000,
+    ),
+  );
+
+  // Seed fatigue safety alert
+  at(now - 2 * HOUR, () =>
+    append(
+      "FATIGUE_ALERT_RAISED",
+      "system",
+      {
+        alertId: "fatigue_apex_01",
+        siteId: "apex-tower-b",
+        shiftHours: 12.5,
+        riskLevel: "HIGH",
+        note: "Multiple workers reported continuous 12+ hr concrete pour shifts without mandatory 30-min heat recovery breaks.",
+        nullifier: "null_fatigue_01",
+      },
+      now - 2 * HOUR,
+    ),
+  );
+
   plan
     .sort((a, b) => a.ts - b.ts)
     .forEach((item) => item.commit());

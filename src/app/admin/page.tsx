@@ -56,6 +56,13 @@ interface AdminIssue {
   attestation: Attestation | null;
   blockers: string[];
   reports: ReportLine[];
+  comments?: Array<{
+    commentId: string;
+    body: string;
+    authorBadgeMask: string;
+    ts: number;
+    nullifier: string;
+  }>;
 }
 
 interface IssuesResponse {
@@ -595,6 +602,36 @@ function IssueDetail({
               </p>
             </div>
           ))}
+        </div>
+
+        <div className="card-head" style={{ borderTop: "1px solid var(--border)" }}>
+          <span className="label">Verified Employee Corroborations · {issue.comments?.length ?? 0}</span>
+          <span className="mono small muted">ZK authenticated field commentary</span>
+        </div>
+
+        <div className="card-pad stack-sm">
+          {!issue.comments || issue.comments.length === 0 ? (
+            <p className="hint" style={{ margin: 0 }}>No peer corroborations logged yet.</p>
+          ) : (
+            issue.comments.map((comment) => (
+              <div
+                className="report-note"
+                key={comment.commentId}
+                style={{ borderLeft: "3px solid #10b981", background: "rgba(16, 185, 129, 0.05)" }}
+              >
+                <header>
+                  <span style={{ color: "#10b981", fontWeight: 600 }}>
+                    🛡️ {comment.authorBadgeMask}
+                  </span>
+                  <span>{timeAgo(comment.ts)}</span>
+                </header>
+                <p style={{ margin: "6px 0 0", color: "var(--fg)" }}>{comment.body}</p>
+                <div className="mono small muted" style={{ fontSize: 11, marginTop: 4 }}>
+                  nullifier {comment.nullifier}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 

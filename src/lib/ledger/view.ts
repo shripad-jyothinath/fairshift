@@ -19,6 +19,13 @@ export interface PublicIssue {
   resolution: Issue["resolution"] | null;
   attestation: Issue["attestation"] | null;
   blockers: string[];
+  comments?: Array<{
+    commentId: string;
+    body: string;
+    authorBadgeMask: string;
+    ts: number;
+    nullifier: string;
+  }>;
 }
 
 export function toPublicIssue(issue: Issue, now: number): PublicIssue {
@@ -40,6 +47,7 @@ export function toPublicIssue(issue: Issue, now: number): PublicIssue {
     resolution: issue.resolution ?? null,
     attestation: issue.attestation ?? null,
     blockers: issue.status === "OPEN" ? checkClosure(issue).blockers : [],
+    comments: issue.comments ?? [],
   };
 }
 

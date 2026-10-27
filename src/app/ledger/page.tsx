@@ -333,7 +333,7 @@ function EventRow({ event }: { event: AnyLedgerEvent }) {
           <>
             {" · "}
             <a href={event.payload.explorerUrl} target="_blank" rel="noreferrer">
-              BaseScan ↗
+              {event.payload.explorerUrl.includes("hashscan") ? "HashScan (Hedera)" : "BaseScan"} ↗
             </a>
           </>
         )}
@@ -357,6 +357,10 @@ function summarise(event: AnyLedgerEvent): string {
       return `commitment ${shortHash(event.payload.commitment, 10)} · root ${shortHash(event.payload.root, 8)}`;
     case "REPORT_FILED":
       return `${event.payload.category} · ${event.payload.zone} · nullifier ${shortHash(event.payload.nullifier, 8)}`;
+    case "COMMENT_ADDED":
+      return `${event.payload.authorBadgeMask} · “${event.payload.body.slice(0, 45)}…” · nullifier ${shortHash(event.payload.nullifier, 8)}`;
+    case "FATIGUE_ALERT_RAISED":
+      return `${event.payload.riskLevel} FATIGUE ALERT (${event.payload.shiftHours}h shift) · ${event.payload.siteId}`;
     case "ESCALATION_RAISED":
       return `tier ${event.payload.tier + 1} · ${event.payload.reason} · ${event.payload.reporters} reporters`;
     case "RESOLUTION_PUBLISHED":

@@ -119,12 +119,28 @@ export interface EventMap {
     attestationId?: string;
     note: string;
   };
+  COMMENT_ADDED: {
+    commentId: string;
+    clusterId: string;
+    siteId: string;
+    body: string;
+    authorBadgeMask: string;
+    nullifier: string;
+  };
+  FATIGUE_ALERT_RAISED: {
+    alertId: string;
+    siteId: string;
+    shiftHours: number;
+    riskLevel: "MODERATE" | "HIGH" | "CRITICAL";
+    note: string;
+    nullifier: string;
+  };
   ANCHOR: {
     fromSeq: number;
     toSeq: number;
     merkleRoot: string;
     label: string;
-    mode: "LOCAL" | "BASE_SEPOLIA";
+    mode: "LOCAL" | "BASE_SEPOLIA" | "HEDERA_TESTNET";
     txHash?: string;
     chainId?: number;
     contract?: string;
@@ -195,6 +211,13 @@ export interface Issue {
   attestation?: AttestationRecord;
   closedAt?: number;
   closedNote?: string;
+  comments?: Array<{
+    commentId: string;
+    body: string;
+    authorBadgeMask: string;
+    ts: number;
+    nullifier: string;
+  }>;
 }
 
 export interface LedgerState {
@@ -209,6 +232,14 @@ export interface LedgerState {
   enrollments: Set<string>;
   payrollKeys: Map<string, string>;
   memberSites: Map<string, string>;
+  fatigueAlerts: Array<{
+    alertId: string;
+    siteId: string;
+    shiftHours: number;
+    riskLevel: "MODERATE" | "HIGH" | "CRITICAL";
+    note: string;
+    ts: number;
+  }>;
   lastSeq: number;
   lastTs: number;
 }

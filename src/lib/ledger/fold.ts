@@ -29,6 +29,7 @@ export function emptyState(): LedgerState {
     enrollments: new Set(),
     payrollKeys: new Map(),
     memberSites: new Map(),
+    fatigueAlerts: [],
     lastSeq: 0,
     lastTs: 0,
   };
@@ -200,6 +201,33 @@ export function applyEvent(state: LedgerState, event: AnyLedgerEvent): LedgerSta
       issue.status = "CLOSED";
       issue.closedAt = event.ts;
       issue.closedNote = event.payload.note;
+      break;
+    }
+
+    case "COMMENT_ADDED": {
+      const issue = state.issues.get(event.payload.clusterId);
+      if (issue) {
+        if (!issue.comments) issue.comments = [];
+        issue.comments.push({
+          commentId: event.payload.commentId,
+          body: event.payload.body,
+          authorBadgeMask: event.payload.authorBadgeMask,
+          ts: event.ts,
+          nullifier: event.payload.nullifier,
+        });
+      }
+      break;
+    }
+
+    case "FATIGUE_ALERT_RAISED": {
+      state.fatigueAlerts.push({
+        alertId: event.payload.alertId,
+        siteId: event.payload.siteId,
+        shiftHours: event.payload.shiftHours,
+        riskLevel: event.payload.riskLevel,
+        note: event.payload.note,
+        ts: event.ts,
+      });
       break;
     }
 

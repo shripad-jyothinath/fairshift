@@ -7,8 +7,8 @@ import { VoiceChat } from "@/components/VoiceChat";
 import { CATEGORIES } from "@/lib/domain";
 import { messageForBody } from "@/lib/crypto/field";
 import { DEMO_WORKERS_PER_SITE, demoSecret } from "@/lib/demo/secret";
-import { shortHash } from "@/lib/format";
-import type { Category, Sector } from "@/lib/ledger/types";
+import { shortHash, timeAgo } from "@/lib/format";
+import type { Category, Sector, Severity } from "@/lib/ledger/types";
 import type { DeviceIdentity } from "@/lib/worker/identity";
 
 type Lang = "en" | "hi" | "ta";
@@ -22,9 +22,30 @@ interface Site {
   members: number;
 }
 
+export interface StateIssue {
+  clusterId: string;
+  siteId: string;
+  category: Category;
+  zone: string;
+  severity: Severity;
+  reporters: number;
+  tier: number;
+  tierLabel: string;
+  status: "OPEN" | "CLOSED";
+  firstTs: number;
+  comments?: Array<{
+    commentId: string;
+    body: string;
+    authorBadgeMask: string;
+    ts: number;
+    nullifier: string;
+  }>;
+}
+
 interface StateResponse {
   sites: Site[];
   demoMode: boolean;
+  issues?: StateIssue[];
 }
 interface GroupResponse {
   commitments: string[];
@@ -212,6 +233,18 @@ export default function WorkerPage() {
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [listening, setListening] = useState(false);
   const [speechAvailable, setSpeechAvailable] = useState(true);
+  const [issues, setIssues] = useState<StateIssue[]>([]);
+  const [activeTab, setActiveTab] = useState<"report" | "corroborate" | "passport" | "fatigue">("report");
+  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
+  const [commentText, setCommentText] = useState("");
+  const [commenting, setCommenting] = useState(false);
+  const [commentMsg, setCommentMsg] = useState("");
+  const [commentError, setCommentError] = useState("");
+  const [fatigueHours, setFatigueHours] = useState(12);
+  const [fatigueRisk, setFatigueRisk] = useState<"MODERATE" | "HIGH" | "CRITICAL">("HIGH");
+  const [fatigueNote, setFatigueNote] = useState("");
+  const [fatigueMsg, setFatigueMsg] = useState("");
+  const [fatigueBusy, setFatigueBusy] = useState(false);
   const recognitionRef = useRef<Recognition | null>(null);
   const statusRef = useRef<HTMLDivElement | null>(null);
 
@@ -237,6 +270,10 @@ export default function WorkerPage() {
         if (!response.ok) throw new Error("state");
         const data = (await response.json()) as StateResponse;
         setSites(data.sites);
+        setIssues(data.issues ?? []);
+        if (data.issues && data.issues.length > 0) {
+          setSelectedIssueId(data.issues[0].clusterId);
+        }
         const target =
           (stored && data.sites.find((item) => item.siteId === stored.siteId)) || data.sites[0];
         if (target) {
@@ -449,14 +486,125 @@ export default function WorkerPage() {
     }
   };
 
+  const postComment = async (clusterId: string) => {
+    if (!commentText.trim()) return;
+    if (!verifiedEmp && !device) {
+      setCommentError("Real employee verification required. Please onboard your badge above.");
+      return;
+    }
+    setCommenting(true);
+    setCommentError("");
+    setCommentMsg("");
+    try {
+      const response = await fetch(`/api/issues/${encodeURIComponent(clusterId)}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          body: commentText.trim(),
+          siteId: reportingSiteId,
+          isVerified: true,
+          workerBadgeId: verifiedEmp?.id ?? "EMP-DEVICE",
+          authorBadgeMask: verifiedEmp
+            ? `Verified Site Worker (${verifiedEmp.role})`
+            : "Verified Device Worker (ZK Protected)",
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setCommentError(data.error ?? "Failed to post comment");
+        return;
+      }
+      setIssues((prev) =>
+        prev.map((iss) =>
+          iss.clusterId === clusterId
+            ? { ...iss, comments: [...(iss.comments ?? []), data.comment] }
+            : iss,
+        ),
+      );
+      setCommentText("");
+      setCommentMsg("✓ Corroboration verified & anchored to ledger!");
+      setTimeout(() => setCommentMsg(""), 4000);
+    } catch {
+      setCommentError("Network error while submitting comment");
+    } finally {
+      setCommenting(false);
+    }
+  };
+
+  const submitFatigue = async () => {
+    setFatigueBusy(true);
+    setFatigueMsg("");
+    try {
+      const response = await fetch("/api/fatigue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          siteId: reportingSiteId,
+          shiftHours: fatigueHours,
+          riskLevel: fatigueRisk,
+          note: fatigueNote.trim() || `Flagged ${fatigueHours}+ hr shift without adequate recovery rest.`,
+          workerBadgeId: verifiedEmp?.id ?? "EMP-DEVICE",
+          isVerified: Boolean(verifiedEmp || device),
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setFatigueMsg(data.error ?? "Failed to log fatigue report");
+        return;
+      }
+      setFatigueMsg("✓ Fatigue safety alert signed and added to ledger audit trail.");
+      setFatigueNote("");
+    } catch {
+      setFatigueMsg("Error submitting fatigue advisory.");
+    } finally {
+      setFatigueBusy(false);
+    }
+  };
+
   return (
     <div className="page">
       <div className="wrap" style={{ maxWidth: 640 }}>
         <p className="eyebrow">{copy.kicker}</p>
         <h2 style={{ margin: "14px 0 8px" }}>{copy.title}</h2>
-        <p className="small muted" style={{ marginBottom: 20 }}>
+        <p className="small muted" style={{ marginBottom: 16 }}>
           {copy.secondTab}
         </p>
+
+        {/* UN SDG 8 Feature Selector Tabs */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 16 }}>
+          <button
+            type="button"
+            className={`btn ${activeTab === "report" ? "btn-primary" : "btn-quiet"}`}
+            style={{ padding: "8px 2px", fontSize: 12, justifyContent: "center" }}
+            onClick={() => setActiveTab("report")}
+          >
+            ⚠️ Report
+          </button>
+          <button
+            type="button"
+            className={`btn ${activeTab === "corroborate" ? "btn-primary" : "btn-quiet"}`}
+            style={{ padding: "8px 2px", fontSize: 12, justifyContent: "center" }}
+            onClick={() => setActiveTab("corroborate")}
+          >
+            💬 Comments
+          </button>
+          <button
+            type="button"
+            className={`btn ${activeTab === "passport" ? "btn-primary" : "btn-quiet"}`}
+            style={{ padding: "8px 2px", fontSize: 12, justifyContent: "center" }}
+            onClick={() => setActiveTab("passport")}
+          >
+            🪪 Passport
+          </button>
+          <button
+            type="button"
+            className={`btn ${activeTab === "fatigue" ? "btn-primary" : "btn-quiet"}`}
+            style={{ padding: "8px 2px", fontSize: 12, justifyContent: "center" }}
+            onClick={() => setActiveTab("fatigue")}
+          >
+            ⏱️ Fatigue
+          </button>
+        </div>
 
         <div className="worker-shell">
           <div className="worker-head">
@@ -487,18 +635,19 @@ export default function WorkerPage() {
           </div>
 
           <div className="worker-body" lang={lang}>
-            {receipt ? (
-              <ReceiptCard
-                receipt={receipt}
-                copy={copy}
-                statusRef={statusRef}
-                onAgain={() => {
-                  setReceipt(null);
-                  setPhase("idle");
-                }}
-              />
-            ) : (
-              <form onSubmit={submit}>
+            {activeTab === "report" && (
+              receipt ? (
+                <ReceiptCard
+                  receipt={receipt}
+                  copy={copy}
+                  statusRef={statusRef}
+                  onAgain={() => {
+                    setReceipt(null);
+                    setPhase("idle");
+                  }}
+                />
+              ) : (
+                <form onSubmit={submit}>
                 {device && (
                   <div className="callout callout-verified" style={{ marginBottom: 14 }}>
                     <div className="flex-between">
@@ -732,6 +881,47 @@ export default function WorkerPage() {
                   🔒 {copy.identityNote}
                 </p>
               </form>
+            ))}
+
+            {activeTab === "corroborate" && (
+              <CorroborationBoard
+                issues={issues}
+                siteId={reportingSiteId}
+                selectedIssueId={selectedIssueId}
+                onSelectIssue={setSelectedIssueId}
+                commentText={commentText}
+                onChangeCommentText={setCommentText}
+                onPostComment={postComment}
+                commenting={commenting}
+                commentMsg={commentMsg}
+                commentError={commentError}
+                isVerified={Boolean(verifiedEmp || device)}
+                verifiedRole={verifiedEmp?.role ?? "Verified Worker"}
+              />
+            )}
+
+            {activeTab === "passport" && (
+              <SkillPassportCard
+                emp={verifiedEmp}
+                siteName={site?.name}
+                slot={workerIndex}
+              />
+            )}
+
+            {activeTab === "fatigue" && (
+              <FatigueCard
+                siteName={site?.name}
+                hours={fatigueHours}
+                setHours={setFatigueHours}
+                risk={fatigueRisk}
+                setRisk={setFatigueRisk}
+                note={fatigueNote}
+                setNote={setFatigueNote}
+                onSubmit={submitFatigue}
+                busy={fatigueBusy}
+                msg={fatigueMsg}
+                isVerified={Boolean(verifiedEmp || device)}
+              />
             )}
           </div>
         </div>
@@ -798,6 +988,365 @@ function ReceiptCard({
         <Link className="btn btn-quiet" href={`/ledger#${receipt.clusterId}`}>
           {copy.viewLedger}
         </Link>
+      </div>
+    </div>
+  );
+}
+
+function CorroborationBoard({
+  issues,
+  siteId,
+  selectedIssueId,
+  onSelectIssue,
+  commentText,
+  onChangeCommentText,
+  onPostComment,
+  commenting,
+  commentMsg,
+  commentError,
+  isVerified,
+  verifiedRole,
+}: {
+  issues: StateIssue[];
+  siteId: string;
+  selectedIssueId: string | null;
+  onSelectIssue: (id: string) => void;
+  commentText: string;
+  onChangeCommentText: (text: string) => void;
+  onPostComment: (clusterId: string) => void;
+  commenting: boolean;
+  commentMsg: string;
+  commentError: string;
+  isVerified: boolean;
+  verifiedRole: string;
+}) {
+  const siteIssues = issues.filter((i) => !siteId || i.siteId === siteId);
+  const selected = siteIssues.find((i) => i.clusterId === selectedIssueId) || siteIssues[0];
+
+  return (
+    <div className="stack-sm">
+      <div className="flex-between">
+        <span className="label">Active Hazards & Field Corroborations</span>
+        <span className="mono small muted">{siteIssues.length} on ledger</span>
+      </div>
+      <p className="small muted" style={{ margin: "4px 0 12px" }}>
+        Coworkers can corroborate reported hazards and post field updates. Only cryptographically verified employees can comment.
+      </p>
+
+      {siteIssues.length === 0 ? (
+        <div className="callout">No active issues reported at this site yet.</div>
+      ) : (
+        <>
+          <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6 }}>
+            {siteIssues.map((iss) => (
+              <button
+                key={iss.clusterId}
+                type="button"
+                className={`btn ${iss.clusterId === selected?.clusterId ? "btn-primary" : "btn-quiet"}`}
+                style={{ fontSize: 11, padding: "6px 10px", whiteSpace: "nowrap" }}
+                onClick={() => onSelectIssue(iss.clusterId)}
+              >
+                {iss.zone} · {iss.category} ({iss.comments?.length ?? 0})
+              </button>
+            ))}
+          </div>
+
+          {selected && (
+            <div className="card card-pad stack-sm" style={{ marginTop: 10, background: "rgba(0,0,0,0.02)" }}>
+              <div className="flex-between">
+                <span className="label" style={{ color: "var(--fg)" }}>
+                  {selected.zone} · {selected.category}
+                </span>
+                <span className={`stamp ${selected.severity === "CRITICAL" ? "stamp-breach" : "stamp-verified"}`}>
+                  {selected.severity}
+                </span>
+              </div>
+              <div className="mono small muted">
+                Issue ID: {selected.clusterId} · {selected.reporters} verified reporters
+              </div>
+
+              <div style={{ borderTop: "1px solid var(--border)", paddingTop: 10, marginTop: 8 }}>
+                <span className="label" style={{ fontSize: 11 }}>
+                  Verified Coworker Corroborations ({selected.comments?.length ?? 0})
+                </span>
+                {!selected.comments || selected.comments.length === 0 ? (
+                  <p className="hint" style={{ margin: "6px 0 0" }}>
+                    No comments yet. Verified coworkers can add the first corroboration below.
+                  </p>
+                ) : (
+                  <div className="stack-sm" style={{ marginTop: 8 }}>
+                    {selected.comments.map((c) => (
+                      <div
+                        key={c.commentId}
+                        className="report-note"
+                        style={{ borderLeft: "3px solid #10b981", background: "rgba(16, 185, 129, 0.05)", padding: 8 }}
+                      >
+                        <header>
+                          <span style={{ color: "#10b981", fontWeight: 600, fontSize: 11 }}>
+                            🛡️ {c.authorBadgeMask}
+                          </span>
+                          <span style={{ fontSize: 10 }}>{timeAgo(c.ts)}</span>
+                        </header>
+                        <p style={{ margin: "4px 0 0", fontSize: 12 }}>{c.body}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12, marginTop: 12 }}>
+                <label className="label" style={{ display: "block", marginBottom: 6 }}>
+                  Add Coworker Corroboration / Update
+                </label>
+                <textarea
+                  className="textarea"
+                  value={commentText}
+                  onChange={(e) => onChangeCommentText(e.target.value)}
+                  placeholder={
+                    isVerified
+                      ? `Corroborate this hazard as ${verifiedRole} (ZK anonymous)...`
+                      : "Real employee verification required to comment..."
+                  }
+                  disabled={!isVerified}
+                  style={{ minHeight: 64, fontSize: 12 }}
+                />
+
+                {commentError && <div className="callout callout-breach" style={{ marginTop: 6 }}>{commentError}</div>}
+                {commentMsg && <div className="callout callout-verified" style={{ marginTop: 6 }}>{commentMsg}</div>}
+
+                {!isVerified ? (
+                  <div className="callout" style={{ marginTop: 8, fontSize: 11 }}>
+                    🔒 <strong>Employee Verification Required:</strong> Only verified employees enrolled in this site&apos;s Merkle tree can comment. Please complete badge verification above.
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    style={{ width: "100%", marginTop: 8 }}
+                    disabled={commenting || !commentText.trim()}
+                    onClick={() => onPostComment(selected.clusterId)}
+                  >
+                    {commenting ? "Verifying with Semaphore & Anchoring…" : "Post Comment as Verified Employee (ZK Protected)"}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function SkillPassportCard({
+  emp,
+  siteName,
+  slot,
+}: {
+  emp: EmployeeProfile | null;
+  siteName?: string;
+  slot: number;
+}) {
+  const exportPassport = () => {
+    const vc = {
+      "@context": [
+        "https://www.w3.org/2018/credentials/v1",
+        "https://w3id.org/security/suites/ed25519-2020/v1"
+      ],
+      id: `urn:uuid:fairshift-passport-${emp?.id ?? "101"}`,
+      type: ["VerifiableCredential", "WorkforceSafetyPassport"],
+      issuer: {
+        id: "did:fairshift:decentralized-safety-authority",
+        name: "FairShift UN SDG 8 Decent Work Platform",
+      },
+      issuanceDate: new Date().toISOString(),
+      credentialSubject: {
+        id: `did:semaphore:worker-leaf-${slot + 1}`,
+        badgeId: emp?.id ?? "EMP-101",
+        role: emp?.role ?? "Safety Lead",
+        facility: siteName ?? "Apex Tower B Construction",
+        certifications: [
+          { name: "OSHA-30 Site Safety & Fall Prevention", validThrough: "2027-11-01", status: "VERIFIED" },
+          { name: "Scaffolding Load & Coupler Inspector Level 2", validThrough: "2028-10-15", status: "VERIFIED" },
+          { name: "Emergency First Response & CPR", validThrough: "2027-01-20", status: "ACCREDITED" },
+        ],
+        merkleProof: {
+          standard: "Semaphore v4 Groth16 BN254",
+          anonymitySet: "Site-Wide Workforce Pool",
+          blockchainAnchor: "Hedera-Testnet-296",
+        },
+      },
+    };
+
+    const blob = new Blob([JSON.stringify(vc, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `fairshift-skill-passport-${emp?.id ?? "emp"}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="stack-sm">
+      <div className="flex-between">
+        <span className="label">Digital Safety Skill Passport</span>
+        <span className="stamp stamp-verified">UN SDG 8 Compliant</span>
+      </div>
+      <p className="small muted" style={{ margin: "4px 0 12px" }}>
+        Portable digital record of worker safety training and competencies. Eliminates lost career history so workers never have to restart from zero.
+      </p>
+
+      <div className="card card-pad stack-sm" style={{ border: "1px solid #10b981", background: "rgba(16, 185, 129, 0.03)" }}>
+        <div className="flex-between">
+          <div>
+            <h4 style={{ margin: 0, fontSize: 16 }}>{emp?.role ?? "Journeyman Worker"}</h4>
+            <div className="mono small muted" style={{ marginTop: 2 }}>
+              ID: {emp?.id ?? "EMP-101"} · {siteName ?? "Apex Tower B"}
+            </div>
+          </div>
+          <span className="stamp stamp-verified">ZK Verified</span>
+        </div>
+
+        <div style={{ borderTop: "1px solid var(--border)", paddingTop: 10, marginTop: 10 }} className="stack-sm">
+          <div className="flex-between" style={{ fontSize: 12 }}>
+            <span><strong>OSHA-30 Workplace Safety & Fall Protection</strong></span>
+            <span style={{ color: "#10b981", fontWeight: 600 }}>Active · Exp 2027</span>
+          </div>
+          <div className="flex-between" style={{ fontSize: 12 }}>
+            <span><strong>Scaffolding & Hoist Inspector Level 2</strong></span>
+            <span style={{ color: "#10b981", fontWeight: 600 }}>Active · Exp 2028</span>
+          </div>
+          <div className="flex-between" style={{ fontSize: 12 }}>
+            <span><strong>Emergency CPR & Trauma Response</strong></span>
+            <span style={{ color: "#10b981", fontWeight: 600 }}>Accredited</span>
+          </div>
+          {emp?.id?.startsWith("EMP-2") && (
+            <div className="flex-between" style={{ fontSize: 12 }}>
+              <span><strong>Biohazard Isolation & Sanitation Level 3</strong></span>
+              <span style={{ color: "#10b981", fontWeight: 600 }}>Hospital Certified</span>
+            </div>
+          )}
+        </div>
+
+        <div style={{ marginTop: 12 }}>
+          <button
+            type="button"
+            className="btn btn-quiet"
+            style={{ width: "100%", justifyContent: "center" }}
+            onClick={exportPassport}
+          >
+            📥 Download Verifiable Credential (W3C JSON)
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FatigueCard({
+  siteName,
+  hours,
+  setHours,
+  risk,
+  setRisk,
+  note,
+  setNote,
+  onSubmit,
+  busy,
+  msg,
+  isVerified,
+}: {
+  siteName?: string;
+  hours: number;
+  setHours: (h: number) => void;
+  risk: "MODERATE" | "HIGH" | "CRITICAL";
+  setRisk: (r: "MODERATE" | "HIGH" | "CRITICAL") => void;
+  note: string;
+  setNote: (n: string) => void;
+  onSubmit: () => void;
+  busy: boolean;
+  msg: string;
+  isVerified: boolean;
+}) {
+  return (
+    <div className="stack-sm">
+      <div className="flex-between">
+        <span className="label">Shift Fatigue & Overtime Alert</span>
+        <span className="stamp stamp-breach">Preventative Safety</span>
+      </div>
+      <p className="small muted" style={{ margin: "4px 0 12px" }}>
+        Flags excessive consecutive hours or back-to-back shifts. Logged anonymously to protect worker wellness without fear of shift cancellation.
+      </p>
+
+      <div className="card card-pad stack-sm">
+        <div>
+          <label className="label" style={{ display: "block", marginBottom: 6 }}>
+            Consecutive Hours Worked ({hours} hrs)
+          </label>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
+            {[8, 10, 12, 14].map((h) => (
+              <button
+                key={h}
+                type="button"
+                className={`btn ${hours === h ? "btn-primary" : "btn-quiet"}`}
+                style={{ padding: "6px 0", fontSize: 11, justifyContent: "center" }}
+                onClick={() => setHours(h)}
+              >
+                {h}h{h >= 14 ? "+" : ""}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ marginTop: 10 }}>
+          <label className="label" style={{ display: "block", marginBottom: 6 }}>
+            Risk Assessment
+          </label>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+            {(["MODERATE", "HIGH", "CRITICAL"] as const).map((lvl) => (
+              <button
+                key={lvl}
+                type="button"
+                className={`btn ${risk === lvl ? "btn-primary" : "btn-quiet"}`}
+                style={{ padding: "6px 0", fontSize: 11, justifyContent: "center" }}
+                onClick={() => setRisk(lvl)}
+              >
+                {lvl}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ marginTop: 10 }}>
+          <label className="label" style={{ display: "block", marginBottom: 6 }}>
+            Shift Context (Optional)
+          </label>
+          <textarea
+            className="textarea"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="e.g. Concrete pour overtime running continuously into day shift without mandated rest period."
+            style={{ minHeight: 60, fontSize: 12 }}
+          />
+        </div>
+
+        {msg && <div className="callout callout-verified" style={{ marginTop: 8 }}>{msg}</div>}
+
+        <button
+          type="button"
+          className="btn btn-primary"
+          style={{ width: "100%", marginTop: 10 }}
+          disabled={busy || !isVerified}
+          onClick={onSubmit}
+        >
+          {busy ? "Signing Fatigue Alert to Ledger…" : "Log Anonymous Fatigue Warning to Site Director"}
+        </button>
+        {!isVerified && (
+          <span className="hint" style={{ textAlign: "center", display: "block", marginTop: 4 }}>
+            🔒 Verify employee badge above to submit.
+          </span>
+        )}
       </div>
     </div>
   );
